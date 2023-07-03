@@ -15,7 +15,7 @@ const App = () => {
           <ul>
             <li>
               <Link to="/">
-                <img src={process.env.PUBLIC_URL + '/AOEMilad+PicOnly.png'} alt="Logo" />
+                <img src={process.env.PUBLIC_URL + '/AOE Circle Logo.png'} alt="Logo" />
               </Link>
             </li>
             <li><Link to="/">Home</Link></li>
