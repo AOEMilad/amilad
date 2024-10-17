@@ -4,96 +4,73 @@ import { useEffect, useState } from "react";
 
 export default function Home() {
   const [isLoaded, setIsLoaded] = useState(false);
-  const hardCodedPassword = process.env.NEXT_PUBLIC_PERSONAL_PASSWORD;
+  const [attempts, setAttempts] = useState<number>(0);
+  const [timeout, setTimeoutState] = useState<number>(0);
+  const [isTimedOut, setIsTimedOut] = useState<boolean>(false);
+  const password = process.env.NEXT_PUBLIC_PERSONAL_PASSWORD;
 
   useEffect(() => {
     setIsLoaded(true);
-    const attempts = localStorage.getItem("attempts");
-    const timeout = localStorage.getItem("isTimeout");
+    const savedAttempts = localStorage.getItem("attempts");
+    const savedTimeout = localStorage.getItem("timeout");
 
-    // Restore state from localStorage
-    if (attempts) {
-      setAttempts(parseInt(attempts, 10));
+    if (savedAttempts) {
+      setAttempts(Number(savedAttempts));
     }
-    if (timeout) {
-      const remainingTime = parseInt(timeout, 10);
-      if (remainingTime > Date.now()) {
-        // If the timeout is still active, set isTimeout to true
-        const timeLeft = Math.ceil((remainingTime - Date.now()) / 1000);
-        setRemainingTime(timeLeft);
-        setIsTimeout(true);
 
-        // Reset attempts after the timeout period
-        const timeoutDuration = remainingTime - Date.now();
-        setTimeout(() => {
-          localStorage.removeItem("attempts");
-          localStorage.removeItem("isTimeout");
-          setAttempts(0);
-          setIsTimeout(false);
-          setRemainingTime(0); // Reset remaining time
-        }, timeoutDuration);
+    if (savedTimeout) {
+      const currentTime = Date.now();
+      if (currentTime < Number(savedTimeout)) {
+        setIsTimedOut(true);
+        setTimeoutState((Number(savedTimeout) - currentTime) / 1000); // in seconds
       }
     }
   }, []);
 
-  const [attempts, setAttempts] = useState(0);
-  const [isTimeout, setIsTimeout] = useState(false);
-  const [remainingTime, setRemainingTime] = useState(0);
-
-  const handlePersonalClick = (e: { preventDefault: () => void; }) => {
-    e.preventDefault(); // Prevent default link behavior
-
-    // Check if timeout is active
-    if (isTimeout) {
-      alert(`Too many attempts. Please wait ${remainingTime} seconds before trying again.`);
+  const handlePersonalClick = () => {
+    if (isTimedOut) {
+      alert(`You are temporarily locked out. Please wait ${Math.ceil(timeout)} seconds.`);
       return;
     }
 
-    const userInput = prompt('Enter the password to access Personal:');
+    const inputPassword = prompt("Enter password:");
 
-    // Check if the user clicked Cancel
-    if (userInput === null) {
-      return; // Exit the function if Cancel is clicked
+    if (inputPassword === null) {
+      return; // User clicked cancel
     }
 
-    if (userInput === hardCodedPassword) {
-      window.location.href = "https://personal.amilad.ca"; // Redirect after correct password
+    if (inputPassword === password) {
+      alert("Access granted!");
+      // Redirect to the personal link or perform your action here
+      window.location.href = "https://personal.amilad.ca";
     } else {
-      const newAttempts = attempts + 1; // Increment the attempt count
+      const newAttempts = attempts + 1;
       setAttempts(newAttempts);
       localStorage.setItem("attempts", newAttempts.toString()); // Save attempts to localStorage
-      alert('Incorrect password. Please try again.');
 
-      // Check if attempts reached 3
       if (newAttempts >= 3) {
-        setIsTimeout(true); // Activate timeout
-        alert('Too many attempts. Please wait 30 seconds before trying again.');
+        const lockoutTime = 30; // seconds
+        setIsTimedOut(true);
+        const unlockTime = Date.now() + lockoutTime * 1000;
+        localStorage.setItem("timeout", unlockTime.toString()); // Save timeout to localStorage
 
-        // Set timeout in localStorage for 30 seconds
-        const timeoutEnd = Date.now() + 30000; // 30 seconds from now
-        localStorage.setItem("isTimeout", timeoutEnd.toString());
+        let countdown = lockoutTime;
+        setTimeout(() => {
+          setIsTimedOut(false);
+          setAttempts(0);
+          localStorage.setItem("attempts", "0"); // Reset attempts
+          localStorage.removeItem("timeout"); // Remove timeout
+        }, lockoutTime * 1000);
 
-        // Start countdown for remaining time
-        let countdown = 30; // 30 seconds
-        setRemainingTime(countdown); // Set initial remaining time
         const interval = setInterval(() => {
-          countdown -= 1; // Decrease countdown every second
-          setRemainingTime(countdown); // Update state with remaining time
-
+          countdown--;
+          setTimeoutState(countdown);
           if (countdown <= 0) {
-            clearInterval(interval); // Clear interval when countdown reaches 0
+            clearInterval(interval);
           }
         }, 1000);
-
-        // Set timeout to reset attempts after 30 seconds
-        setTimeout(() => {
-          localStorage.removeItem("attempts");
-          localStorage.removeItem("isTimeout");
-          setAttempts(0);
-          setIsTimeout(false);
-          setRemainingTime(0); // Reset remaining time
-          clearInterval(interval); // Clear interval on reset
-        }, 30000); // 30 seconds
+      } else {
+        alert(`Incorrect password. You have ${3 - newAttempts} attempts left.`);
       }
     }
   };
@@ -102,7 +79,8 @@ export default function Home() {
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-r from-blue-400 to-blue-600">
       <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
         {/* Personal Button */}
-        <button
+        <Link
+          href="#"
           onClick={handlePersonalClick}
           className={`relative inline-flex items-center justify-center p-0.5 mb-2 me-2 overflow-hidden text-sm font-medium text-gray-900 rounded-lg group bg-gradient-to-br from-purple-600 to-blue-500 group-hover:from-purple-600 group-hover:to-blue-500 hover:text-white dark:text-white focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800 
             transition-transform duration-700 ${
@@ -112,7 +90,7 @@ export default function Home() {
           <span className="relative px-5 py-2.5 transition-all ease-in duration-75 bg-white dark:bg-gray-900 rounded-md group-hover:bg-opacity-0">
             Personal
           </span>
-        </button>
+        </Link>
 
         {/* Portfolio Button */}
         <Link
@@ -127,13 +105,6 @@ export default function Home() {
           </span>
         </Link>
       </div>
-
-      {/* Display remaining time if timeout is active */}
-      {isTimeout && (
-        <div className="fixed bottom-4 left-4 p-4 bg-red-500 text-white rounded">
-          Too many attempts. Please wait {remainingTime} seconds before trying again.
-        </div>
-      )}
     </div>
   );
 }
